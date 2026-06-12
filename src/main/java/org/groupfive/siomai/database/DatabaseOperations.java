@@ -29,6 +29,11 @@ public interface DatabaseOperations {
     // --- Daily Codes ---
     String getDailyCode(Date date) throws SQLException;
     void setDailyCode(String code, Date date) throws SQLException;
+
+    // --- Per-Employee Daily Codes ---
+    String getEmployeeDailyCode(int employeeId, Date date) throws SQLException;
+    void setEmployeeDailyCode(int employeeId, String code, Date date) throws SQLException;
+    List<AttendanceRecord> getAttendanceLogsForEmployee(int employeeId) throws SQLException;
     
     // --- Attendance Logs ---
     AttendanceRecord getTodayAttendanceRecord(int employeeId, Date date) throws SQLException;

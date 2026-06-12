@@ -7,11 +7,15 @@ import org.groupfive.siomai.service.KioskService;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.plaf.basic.BasicComboPopup;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -25,14 +29,16 @@ public class KioskFrame extends JFrame {
     private static final Color TEXT_MUTED = new Color(160, 174, 192);
     private static final Color ACCENT_GREEN = new Color(46, 204, 113);   // Clock In
     private static final Color ACCENT_RED = new Color(231, 76, 60);       // Clock Out
-    private static final Color BUTTON_BG = new Color(44, 62, 80);         // Back button
+    private static final Color BUTTON_BG = new Color(44, 62, 80);         // View stats / Back button
 
     private final JFrame parent;
     private final KioskService kioskService = new KioskService();
 
     private JTextField searchField;
+    private JComboBox<Employee> employeeComboBox;
     private JTextField codeField;
     private JLabel statusLabel;
+    private List<Employee> activeEmployees = new ArrayList<>();
 
     public KioskFrame(JFrame parent) {
         this.parent = parent;
@@ -41,6 +47,13 @@ public class KioskFrame extends JFrame {
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         getContentPane().setBackground(BG_COLOR);
+
+        // Load active employees
+        try {
+            activeEmployees = kioskService.getAllActiveEmployees();
+        } catch (SQLException e) {
+            activeEmployees = new ArrayList<>();
+        }
 
         // Root Panel layout
         JPanel root = new JPanel(new BorderLayout());
@@ -81,8 +94,8 @@ public class KioskFrame extends JFrame {
         JPanel kioskCard = new JPanel();
         kioskCard.setLayout(new BoxLayout(kioskCard, BoxLayout.Y_AXIS));
         kioskCard.setBackground(CARD_BG);
-        kioskCard.setPreferredSize(new Dimension(500, 420));
-        kioskCard.setMaximumSize(new Dimension(500, 420));
+        kioskCard.setPreferredSize(new Dimension(500, 580));
+        kioskCard.setMaximumSize(new Dimension(500, 580));
         kioskCard.setBorder(BorderFactory.createCompoundBorder(
                 new LineBorder(new Color(45, 55, 72), 1, true),
                 new EmptyBorder(30, 40, 30, 40)
@@ -93,7 +106,7 @@ public class KioskFrame extends JFrame {
         cardTitle.setForeground(TEXT_PRIMARY);
         cardTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JLabel cardSub = new JLabel("Enter your details to log attendance logs");
+        JLabel cardSub = new JLabel("Select employee & enter your verification code");
         cardSub.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         cardSub.setForeground(TEXT_MUTED);
         cardSub.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -104,44 +117,87 @@ public class KioskFrame extends JFrame {
         kioskCard.add(Box.createRigidArea(new Dimension(0, 30)));
 
         // Inputs Panel
-        JPanel inputsPanel = new JPanel(new GridLayout(4, 1, 5, 5));
+        JPanel inputsPanel = new JPanel(new GridLayout(6, 1, 5, 5));
         inputsPanel.setOpaque(false);
         inputsPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JLabel searchLabel = new JLabel("Employee Name or Code:");
+        JLabel searchLabel = new JLabel("Search Employee (Name or Code):");
         searchLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
         searchLabel.setForeground(TEXT_MUTED);
 
         searchField = new JTextField();
         styleTextField(searchField);
 
+        JLabel selectLabel = new JLabel("Select Employee:");
+        selectLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        selectLabel.setForeground(TEXT_MUTED);
+
+        employeeComboBox = new JComboBox<>();
+        styleComboBox(employeeComboBox);
+
+        // Initial filtering
+        filterEmployees("");
+
+        // Add filter document listener
+        searchField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) { filter(); }
+            @Override
+            public void removeUpdate(DocumentEvent e) { filter(); }
+            @Override
+            public void changedUpdate(DocumentEvent e) { filter(); }
+
+            private void filter() {
+                SwingUtilities.invokeLater(() -> filterEmployees(searchField.getText()));
+            }
+        });
+
         JLabel codeLabel = new JLabel("Daily Verification Code:");
         codeLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
         codeLabel.setForeground(TEXT_MUTED);
 
+        codeField = new JPasswordField() {
+            // Use password field structure but allow normal rendering or standard input.
+            // Actually standard JTextField is cleaner, let's keep it as JTextField so they see the numbers.
+        };
         codeField = new JTextField();
         styleTextField(codeField);
 
         inputsPanel.add(searchLabel);
         inputsPanel.add(searchField);
+        inputsPanel.add(selectLabel);
+        inputsPanel.add(employeeComboBox);
         inputsPanel.add(codeLabel);
         inputsPanel.add(codeField);
         kioskCard.add(inputsPanel);
 
         // Buttons Panel
-        JPanel buttonsPanel = new JPanel(new GridLayout(1, 2, 20, 0));
+        JPanel buttonsPanel = new JPanel();
+        buttonsPanel.setLayout(new BoxLayout(buttonsPanel, BoxLayout.Y_AXIS));
         buttonsPanel.setOpaque(false);
         buttonsPanel.setBorder(new EmptyBorder(25, 0, 15, 0));
         buttonsPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
+        JPanel row1 = new JPanel(new GridLayout(1, 2, 20, 0));
+        row1.setOpaque(false);
         JButton clockInBtn = createButton("CLOCK IN", ACCENT_GREEN);
         clockInBtn.addActionListener(e -> triggerClockAction(true));
 
         JButton clockOutBtn = createButton("CLOCK OUT", ACCENT_RED);
         clockOutBtn.addActionListener(e -> triggerClockAction(false));
 
-        buttonsPanel.add(clockInBtn);
-        buttonsPanel.add(clockOutBtn);
+        row1.add(clockInBtn);
+        row1.add(clockOutBtn);
+        buttonsPanel.add(row1);
+
+        buttonsPanel.add(Box.createRigidArea(new Dimension(0, 12)));
+
+        JButton viewStatsBtn = createButton("VIEW MY STATS & HISTORY", BUTTON_BG);
+        viewStatsBtn.addActionListener(e -> triggerViewStatsAction());
+        viewStatsBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 45));
+        viewStatsBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        buttonsPanel.add(viewStatsBtn);
+
         kioskCard.add(buttonsPanel);
 
         // Status Label
@@ -198,6 +254,43 @@ public class KioskFrame extends JFrame {
         ));
     }
 
+    private void styleComboBox(JComboBox<Employee> box) {
+        box.setBackground(new Color(23, 28, 41));
+        box.setForeground(TEXT_PRIMARY);
+        box.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        box.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(new Color(55, 68, 92), 1, true),
+                new EmptyBorder(5, 5, 5, 5)
+        ));
+
+        // Use a customized renderer for list items to match the theme.
+        box.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                if (value instanceof Employee) {
+                    Employee emp = (Employee) value;
+                    setText(emp.getEmployeeCode() + " - " + emp.getFullName());
+                } else if (value == null) {
+                    setText("");
+                }
+                setBackground(isSelected ? new Color(45, 55, 72) : new Color(23, 28, 41));
+                setForeground(TEXT_PRIMARY);
+                return this;
+            }
+        });
+
+        // Try to style the popup panel list background if using BasicComboPopup
+        Object child = box.getAccessibleContext().getAccessibleChild(0);
+        if (child instanceof BasicComboPopup) {
+            BasicComboPopup popup = (BasicComboPopup) child;
+            popup.getList().setBackground(new Color(23, 28, 41));
+            popup.getList().setForeground(TEXT_PRIMARY);
+            popup.getList().setSelectionBackground(new Color(45, 55, 72));
+            popup.getList().setSelectionForeground(TEXT_PRIMARY);
+        }
+    }
+
     private JButton createButton(String text, Color baseColor) {
         JButton btn = new JButton(text);
         btn.setFont(new Font("Segoe UI", Font.BOLD, 14));
@@ -232,61 +325,112 @@ public class KioskFrame extends JFrame {
         }).start();
     }
 
+    private void filterEmployees(String query) {
+        String text = query.toLowerCase().trim();
+        Employee previouslySelected = (Employee) employeeComboBox.getSelectedItem();
+        employeeComboBox.removeAllItems();
+        
+        Employee newSelection = null;
+        for (Employee emp : activeEmployees) {
+            if (text.isEmpty() ||
+                emp.getFullName().toLowerCase().contains(text) ||
+                emp.getEmployeeCode().toLowerCase().contains(text)) {
+                employeeComboBox.addItem(emp);
+                if (previouslySelected != null && emp.getId() == previouslySelected.getId()) {
+                    newSelection = emp;
+                }
+            }
+        }
+        
+        if (newSelection != null) {
+            employeeComboBox.setSelectedItem(newSelection);
+        }
+    }
+
+    private void refreshActiveEmployees() {
+        try {
+            activeEmployees = kioskService.getAllActiveEmployees();
+            filterEmployees(searchField.getText());
+        } catch (SQLException e) {
+            showStatus("Database error refreshing list: " + e.getMessage(), ACCENT_RED);
+        }
+    }
+
     private void triggerClockAction(boolean isClockIn) {
         statusLabel.setText(" ");
-        String searchInput = searchField.getText();
-        String dailyCode = codeField.getText();
+        Employee selectedEmployee = (Employee) employeeComboBox.getSelectedItem();
+        String dailyCode = codeField.getText().trim();
 
-        if (searchInput.trim().isEmpty() || dailyCode.trim().isEmpty()) {
-            showStatus("Please fill in both fields!", ACCENT_RED);
+        if (selectedEmployee == null) {
+            showStatus("Please select your employee name from the dropdown!", ACCENT_RED);
+            return;
+        }
+
+        if (dailyCode.isEmpty()) {
+            showStatus("Please enter your daily verification code!", ACCENT_RED);
             return;
         }
 
         try {
-            // 1. Search active employees
-            List<Employee> matches = kioskService.searchActiveEmployees(searchInput);
-            Employee selectedEmployee;
+            // 1. Validate daily code
+            kioskService.validateEmployeeDailyCode(selectedEmployee.getId(), dailyCode);
 
-            if (matches.size() == 1) {
-                selectedEmployee = matches.get(0);
-            } else {
-                // Prompt dropdown selection
-                Object selection = JOptionPane.showInputDialog(
-                        this,
-                        "Multiple employees matched. Please select yours:",
-                        "Select Employee",
-                        JOptionPane.QUESTION_MESSAGE,
-                        null,
-                        matches.stream().map(e -> e.getEmployeeCode() + " - " + e.getFullName()).toArray(),
-                        null
-                );
-
-                if (selection == null) {
-                    return; // Cancelled
-                }
-
-                String selectedStr = (String) selection;
-                String selectedCode = selectedStr.split(" - ")[0];
-                selectedEmployee = matches.stream()
-                        .filter(e -> e.getEmployeeCode().equals(selectedCode))
-                        .findFirst()
-                        .orElse(null);
-            }
-
-            if (selectedEmployee == null) {
-                return;
-            }
-
-            // 2. Validate daily code
-            kioskService.validateDailyCode(dailyCode);
-
-            // 3. Process clock transaction
+            // 2. Process clock transaction
             String resultMsg = kioskService.processAttendance(selectedEmployee);
 
             // Display results nicely
             showStatus(resultMsg.replace("\n", " | "), ACCENT_GREEN);
             searchField.setText("");
             codeField.setText("");
+
+        } catch (AppException e) {
+            showStatus(e.getMessage(), ACCENT_RED);
+        } catch (SQLException e) {
+            showStatus("Database error: " + e.getMessage(), ACCENT_RED);
+        }
+    }
+
+    private void triggerViewStatsAction() {
+        statusLabel.setText(" ");
+        Employee selectedEmployee = (Employee) employeeComboBox.getSelectedItem();
+        String dailyCode = codeField.getText().trim();
+
+        if (selectedEmployee == null) {
+            showStatus("Please select your employee name from the dropdown!", ACCENT_RED);
+            return;
+        }
+
+        if (dailyCode.isEmpty()) {
+            showStatus("Please enter your daily verification code!", ACCENT_RED);
+            return;
+        }
+
+        try {
+            // 1. Validate daily code
+            kioskService.validateEmployeeDailyCode(selectedEmployee.getId(), dailyCode);
+
+            // 2. Fetch stats
+            String statsText = kioskService.getEmployeeStats(selectedEmployee);
+
+            // 3. Display stats popup with clean styled components
+            JTextArea textArea = new JTextArea(statsText);
+            textArea.setFont(new Font("Consolas", Font.PLAIN, 12));
+            textArea.setBackground(new Color(23, 28, 41));
+            textArea.setForeground(Color.WHITE);
+            textArea.setEditable(false);
+            textArea.setCaretColor(Color.WHITE);
+            textArea.setBorder(new EmptyBorder(10, 10, 10, 10));
+
+            JScrollPane scrollPane = new JScrollPane(textArea);
+            scrollPane.setPreferredSize(new Dimension(650, 420));
+            scrollPane.setBorder(BorderFactory.createLineBorder(new Color(55, 68, 92)));
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    scrollPane,
+                    selectedEmployee.getFullName() + " - Attendance Performance Stats",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
 
         } catch (AppException e) {
             showStatus(e.getMessage(), ACCENT_RED);

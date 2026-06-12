@@ -282,7 +282,76 @@ public class DatabaseOperationsImpl implements DatabaseOperations {
         }
         return list;
     }
+    @Override
+    public String getEmployeeDailyCode(int employeeId, Date date) throws SQLException {
+        String sql = "SELECT validation_code FROM employee_daily_codes WHERE employee_id = ? AND generated_date = ?";
+        try (Connection conn = DatabaseConnector.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, employeeId);
+            ps.setDate(2, date);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("validation_code");
+                }
+            }
+        }
+        return null;
+    }
 
+    @Override
+    public void setEmployeeDailyCode(int employeeId, String code, Date date) throws SQLException {
+        String selectSql = "SELECT id FROM employee_daily_codes WHERE employee_id = ? AND generated_date = ?";
+        try (Connection conn = DatabaseConnector.getConnection();
+             PreparedStatement psSelect = conn.prepareStatement(selectSql)) {
+            psSelect.setInt(1, employeeId);
+            psSelect.setDate(2, date);
+            try (ResultSet rs = psSelect.executeQuery()) {
+                if (rs.next()) {
+                    String updateSql = "UPDATE employee_daily_codes SET validation_code = ? WHERE employee_id = ? AND generated_date = ?";
+                    try (PreparedStatement psUpdate = conn.prepareStatement(updateSql)) {
+                        psUpdate.setString(1, code);
+                        psUpdate.setInt(2, employeeId);
+                        psUpdate.setDate(3, date);
+                        psUpdate.executeUpdate();
+                    }
+                } else {
+                    String insertSql = "INSERT INTO employee_daily_codes (employee_id, validation_code, generated_date) VALUES (?, ?, ?)";
+                    try (PreparedStatement psInsert = conn.prepareStatement(insertSql)) {
+                        psInsert.setInt(1, employeeId);
+                        psInsert.setString(2, code);
+                        psInsert.setDate(3, date);
+                        psInsert.executeUpdate();
+                    }
+                }
+            }
+        }
+    }
+
+    @Override
+    public List<AttendanceRecord> getAttendanceLogsForEmployee(int employeeId) throws SQLException {
+        String sql = "SELECT * FROM attendance_logs WHERE employee_id = ? ORDER BY log_date DESC, clock_in DESC";
+        List<AttendanceRecord> list = new ArrayList<>();
+        try (Connection conn = DatabaseConnector.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, employeeId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Timestamp clockOut = rs.getTimestamp("clock_out");
+                    Timestamp clockIn = rs.getTimestamp("clock_in");
+                    Date logDate = getLogDateHelper(rs, "log_date");
+                    list.add(new AttendanceRecord(
+                        rs.getInt("id"),
+                        rs.getInt("employee_id"),
+                        clockIn,
+                        clockOut,
+                        logDate,
+                        rs.getDouble("work_hours")
+                    ));
+                }
+            }
+        }
+        return list;
+    }
     private Date getLogDateHelper(ResultSet rs, String columnName) throws SQLException {
         String dateStr = rs.getString(columnName);
         if (dateStr == null) {

@@ -68,9 +68,7 @@ public class DatabaseConnector {
         String url = String.format("jdbc:mysql://%s:%s/%s?useSSL=true&trustServerCertificate=true&allowPublicKeyRetrieval=true", host, port, name);
         Connection conn = DriverManager.getConnection(url, user, pass);
 
-        if (!checkIfMySQLTableExists(conn)) {
-            initializeMySQLDatabase(conn);
-        }
+        initializeMySQLDatabase(conn);
 
         return conn;
     }
@@ -86,9 +84,7 @@ public class DatabaseConnector {
         boolean dbExists = new File(SQLITE_DB_NAME).exists();
         Connection conn = DriverManager.getConnection(url);
 
-        if (!dbExists) {
-            initializeSQLiteDatabase(conn);
-        }
+        initializeSQLiteDatabase(conn);
         return conn;
     }
 
@@ -144,6 +140,16 @@ public class DatabaseConnector {
                     "log_date TEXT NOT NULL DEFAULT (date('now'))," +
                     "work_hours REAL DEFAULT 0.0," +
                     "FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE" +
+                    ");");
+
+            // 5. Employee Daily Codes Table
+            stmt.execute("CREATE TABLE IF NOT EXISTS employee_daily_codes (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "employee_id INTEGER NOT NULL," +
+                    "validation_code TEXT NOT NULL," +
+                    "generated_date TEXT NOT NULL," +
+                    "FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE," +
+                    "UNIQUE(employee_id, generated_date)" +
                     ");");
         }
     }
@@ -206,6 +212,16 @@ public class DatabaseConnector {
                     "log_date DATE NOT NULL DEFAULT (CURRENT_DATE)," +
                     "work_hours DOUBLE DEFAULT 0.0," +
                     "FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE" +
+                    ");");
+
+            // 5. Employee Daily Codes Table
+            stmt.execute("CREATE TABLE IF NOT EXISTS employee_daily_codes (" +
+                    "id INT AUTO_INCREMENT PRIMARY KEY," +
+                    "employee_id INT NOT NULL," +
+                    "validation_code VARCHAR(10) NOT NULL," +
+                    "generated_date DATE NOT NULL," +
+                    "FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE," +
+                    "UNIQUE(employee_id, generated_date)" +
                     ");");
         }
     }

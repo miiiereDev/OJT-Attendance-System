@@ -64,13 +64,24 @@ public class AdminServiceTest {
     }
 
     @Test
-    public void testGenerateDailyCode() throws SQLException {
-        String generatedCode = adminService.generateDailyCode();
-        assertNotNull(generatedCode);
-        assertEquals(5, generatedCode.length(), "Code should be exactly 5 digits long");
+    public void testEmployeeDailyCodes() throws SQLException {
+        Employee alice = dbOps.getEmployeeByCode("EMP-001");
+        assertNotNull(alice);
+        int aliceId = alice.getId();
 
-        String fetchedCode = adminService.getTodayDailyCode();
-        assertEquals(generatedCode, fetchedCode);
+        String code1 = adminService.getEmployeeCodeForToday(aliceId);
+        assertNotNull(code1);
+        assertEquals(5, code1.length(), "Code should be exactly 5 digits long");
+
+        String code2 = adminService.getEmployeeCodeForToday(aliceId);
+        assertEquals(code1, code2, "Subsequent fetches today should return the same code");
+
+        String resetCode = adminService.resetEmployeeCode(aliceId);
+        assertNotNull(resetCode);
+        assertEquals(5, resetCode.length());
+
+        String fetchedCode = adminService.getEmployeeCodeForToday(aliceId);
+        assertEquals(resetCode, fetchedCode, "Fetched code after reset should match reset code");
     }
 
     @Test

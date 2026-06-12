@@ -35,7 +35,8 @@ public class AdminFrame extends JFrame {
     private JPanel contentPanel;
     private DefaultTableModel employeeModel;
     private JTable employeeTable;
-    private JLabel dailyCodeDisplayLabel;
+    private DefaultTableModel dailyCodeModel;
+    private JTable dailyCodeTable;
     private JTextArea reportTextArea;
 
     public AdminFrame(JFrame parent) {
@@ -259,56 +260,99 @@ public class AdminFrame extends JFrame {
     }
 
     private void initCodeCenterCard() {
-        JPanel panel = new JPanel(new GridBagLayout());
+        JPanel panel = new JPanel(new BorderLayout());
         panel.setOpaque(false);
         panel.setBorder(new EmptyBorder(25, 25, 25, 25));
 
-        JPanel container = new JPanel();
-        container.setLayout(new BoxLayout(container, BoxLayout.Y_AXIS));
-        container.setBackground(CARD_BG);
-        container.setBorder(BorderFactory.createCompoundBorder(
-                new LineBorder(new Color(45, 55, 72), 1, true),
-                new EmptyBorder(40, 40, 40, 40)
-        ));
-
-        JLabel title = new JLabel("DAILY VERIFICATION CODE");
+        JLabel title = new JLabel("Daily Code Center");
         title.setFont(new Font("Segoe UI", Font.BOLD, 22));
         title.setForeground(TEXT_PRIMARY);
-        title.setAlignmentX(Component.CENTER_ALIGNMENT);
+        title.setBorder(new EmptyBorder(0, 0, 15, 0));
+        panel.add(title, BorderLayout.NORTH);
 
-        JLabel subTitle = new JLabel("Generated rolling code required for Kiosk Check-In / Check-Out");
-        subTitle.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        subTitle.setForeground(TEXT_MUTED);
-        subTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+        dailyCodeModel = new DefaultTableModel(new String[]{"ID", "Employee Code", "Full Name", "Department", "Daily Code"}, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        dailyCodeTable = new JTable(dailyCodeModel);
+        styleTable(dailyCodeTable);
 
-        dailyCodeDisplayLabel = new JLabel("-----", JLabel.CENTER);
-        dailyCodeDisplayLabel.setFont(new Font("Monospaced", Font.BOLD, 48));
-        dailyCodeDisplayLabel.setForeground(ACCENT_BLUE);
-        dailyCodeDisplayLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        JButton generateBtn = createActionButton("GENERATE NEW DAILY CODE", ACCENT_BLUE);
-        generateBtn.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        generateBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        generateBtn.addActionListener(e -> {
-            try {
-                String newCode = adminService.generateDailyCode();
-                dailyCodeDisplayLabel.setText(newCode);
-                JOptionPane.showMessageDialog(this, "New verification code generated successfully: " + newCode);
-            } catch (SQLException ex) {
-                JOptionPane.showMessageDialog(this, "Error generating code: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        // Customize the "Daily Code" column cell renderer to make it stand out
+        dailyCodeTable.getColumnModel().getColumn(4).setCellRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                setHorizontalAlignment(JLabel.CENTER);
+                setFont(new Font("Monospaced", Font.BOLD, 14));
+                if (!isSelected) {
+                    setForeground(ACCENT_BLUE);
+                } else {
+                    setForeground(TEXT_PRIMARY);
+                }
+                return c;
             }
         });
 
-        container.add(title);
-        container.add(Box.createRigidArea(new Dimension(0, 5)));
-        container.add(subTitle);
-        container.add(Box.createRigidArea(new Dimension(0, 40)));
-        container.add(dailyCodeDisplayLabel);
-        container.add(Box.createRigidArea(new Dimension(0, 40)));
-        container.add(generateBtn);
+        JScrollPane scrollPane = new JScrollPane(dailyCodeTable);
+        scrollPane.getViewport().setBackground(BG_DARK);
+        scrollPane.setBorder(BorderFactory.createLineBorder(new Color(45, 55, 72)));
+        panel.add(scrollPane, BorderLayout.CENTER);
 
-        panel.add(container);
+        // Control Panel
+        JPanel controlPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
+        controlPanel.setOpaque(false);
+        controlPanel.setBorder(new EmptyBorder(15, 0, 0, 0));
+
+        JButton resetBtn = createActionButton("Reset Selected Employee Code", ACCENT_BLUE);
+        resetBtn.addActionListener(e -> {
+            int selectedRow = dailyCodeTable.getSelectedRow();
+            if (selectedRow == -1) {
+                JOptionPane.showMessageDialog(this, "Please select an employee from the table first!", "No Selection", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            int employeeId = (int) dailyCodeTable.getValueAt(selectedRow, 0);
+            String empName = (String) dailyCodeTable.getValueAt(selectedRow, 2);
+            try {
+                String newCode = adminService.resetEmployeeCode(employeeId);
+                refreshDailyCode();
+                JOptionPane.showMessageDialog(this, "Code successfully reset/regenerated for " + empName + ": " + newCode);
+            } catch (SQLException ex) {
+                JOptionPane.showMessageDialog(this, "Error resetting code: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        JButton refreshBtn = createActionButton("Refresh List", CARD_BG);
+        refreshBtn.addActionListener(e -> refreshDailyCode());
+
+        controlPanel.add(resetBtn);
+        controlPanel.add(refreshBtn);
+        panel.add(controlPanel, BorderLayout.SOUTH);
+
         contentPanel.add(panel, "codecenter");
+    }
+
+    private void refreshDailyCode() {
+        try {
+            dailyCodeModel.setRowCount(0);
+            List<Employee> list = adminService.getAllEmployees();
+            for (Employee e : list) {
+                // Only show codes for active employees
+                if (e.isActive()) {
+                    String code = adminService.getEmployeeCodeForToday(e.getId());
+                    dailyCodeModel.addRow(new Object[]{
+                            e.getId(),
+                            e.getEmployeeCode(),
+                            e.getFullName(),
+                            e.getDepartment(),
+                            code
+                    });
+                }
+            }
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this, "Error listing daily codes: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private void initReportsCard() {
@@ -335,19 +379,6 @@ public class AdminFrame extends JFrame {
         panel.add(scrollPane, BorderLayout.CENTER);
 
         contentPanel.add(panel, "reports");
-    }
-
-    private void refreshDailyCode() {
-        try {
-            String code = adminService.getTodayDailyCode();
-            if (code != null) {
-                dailyCodeDisplayLabel.setText(code);
-            } else {
-                dailyCodeDisplayLabel.setText("-----");
-            }
-        } catch (SQLException e) {
-            dailyCodeDisplayLabel.setText("ERROR");
-        }
     }
 
     private void refreshReport() {

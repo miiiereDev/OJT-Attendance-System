@@ -59,23 +59,96 @@ public class KioskService {
     }
 
     /**
-     * Validates the daily code for the current date.
+     * Retrieves all active employees in the system.
      *
-     * @param inputCode Entered code
+     * @return List of active employees
+     * @throws SQLException if database access fails
+     */
+    public List<Employee> getAllActiveEmployees() throws SQLException {
+        List<Employee> results = dbOps.getAllEmployees();
+        return results.stream()
+                .filter(Employee::isActive)
+                .toList();
+    }
+
+    /**
+     * Obtains or auto-generates the daily code for a specific employee.
+     */
+    public String getOrGenerateEmployeeCode(int employeeId) throws SQLException {
+        Date today = new Date(System.currentTimeMillis());
+        String code = dbOps.getEmployeeDailyCode(employeeId, today);
+        if (code == null) {
+            // Auto-generate a random 5-digit code
+            int randVal = 10000 + new java.util.Random().nextInt(90000);
+            code = String.valueOf(randVal);
+            dbOps.setEmployeeDailyCode(employeeId, code, today);
+        }
+        return code;
+    }
+
+    /**
+     * Validates the daily code for a specific employee.
+     *
+     * @param employeeId The employee ID
+     * @param inputCode  Entered code
      * @throws InvalidDailyCodeException if the code is invalid or not generated yet
      * @throws SQLException              if database access fails
      */
-    public void validateDailyCode(String inputCode) throws InvalidDailyCodeException, SQLException {
-        Date today = new Date(System.currentTimeMillis());
-        String correctCode = dbOps.getDailyCode(today);
-
-        if (correctCode == null) {
-            throw new InvalidDailyCodeException("Today's verification code has not been generated yet. Please contact an Administrator.");
-        }
-
+    public void validateEmployeeDailyCode(int employeeId, String inputCode) throws InvalidDailyCodeException, SQLException {
+        String correctCode = getOrGenerateEmployeeCode(employeeId);
         if (inputCode == null || !correctCode.equals(inputCode.trim())) {
             throw new InvalidDailyCodeException("Invalid Daily Verification Code!");
         }
+    }
+
+    /**
+     * Compiles attendance history and metrics for an employee.
+     */
+    public String getEmployeeStats(Employee employee) throws SQLException {
+        List<AttendanceRecord> records = dbOps.getAttendanceLogsForEmployee(employee.getId());
+        
+        int totalShifts = records.size();
+        double totalHours = 0.0;
+        int completedShifts = 0;
+        
+        StringBuilder history = new StringBuilder();
+        history.append(String.format("%-12s | %-22s | %-22s | %-12s\n", "DATE", "CLOCK IN", "CLOCK OUT", "HOURS"));
+        history.append("---------------------------------------------------------------------------------\n");
+        
+        for (AttendanceRecord r : records) {
+            String clockInStr = r.getClockIn() != null ? r.getClockIn().toString() : "N/A";
+            String clockOutStr = r.getClockOut() != null ? r.getClockOut().toString() : "ACTIVE SHIFT";
+            
+            history.append(String.format("%-12s | %-22s | %-22s | %.2f hours\n",
+                    r.getLogDate().toString(),
+                    clockInStr,
+                    clockOutStr,
+                    r.getWorkHours()));
+            
+            if (r.getClockOut() != null) {
+                totalHours += r.getWorkHours();
+                completedShifts++;
+            }
+        }
+        
+        double avgHours = completedShifts > 0 ? (totalHours / completedShifts) : 0.0;
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append("=================================================================================\n");
+        sb.append("                     EMPLOYEE PERFORMANCE STATISTICS & RECORD                    \n");
+        sb.append("=================================================================================\n");
+        sb.append(String.format("Employee Code: %s\n", employee.getEmployeeCode()));
+        sb.append(String.format("Full Name:     %s\n", employee.getFullName()));
+        sb.append(String.format("Department:    %s\n", employee.getDepartment()));
+        sb.append("---------------------------------------------------------------------------------\n");
+        sb.append(String.format("Total Registered Shifts:  %d\n", totalShifts));
+        sb.append(String.format("Total Hours Completed:    %.2f hours\n", totalHours));
+        sb.append(String.format("Average Shift Length:     %.2f hours\n", avgHours));
+        sb.append("=================================================================================\n\n");
+        sb.append("LOG HISTORY:\n");
+        sb.append(history.toString());
+        
+        return sb.toString();
     }
 
     /**

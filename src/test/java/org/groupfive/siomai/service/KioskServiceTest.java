@@ -43,15 +43,19 @@ public class KioskServiceTest {
     }
 
     @Test
-    public void testValidateDailyCode() throws SQLException {
+    public void testValidateEmployeeDailyCode() throws SQLException {
+        Employee alice = dbOps.getEmployeeByCode("EMP-001");
+        assertNotNull(alice);
+        int aliceId = alice.getId();
+
         Date today = new Date(System.currentTimeMillis());
-        dbOps.setDailyCode("55555", today);
+        dbOps.setEmployeeDailyCode(aliceId, "55555", today);
 
         // Correct code
-        assertDoesNotThrow(() -> kioskService.validateDailyCode("55555"));
+        assertDoesNotThrow(() -> kioskService.validateEmployeeDailyCode(aliceId, "55555"));
 
         // Incorrect code
-        assertThrows(InvalidDailyCodeException.class, () -> kioskService.validateDailyCode("wrong_code"));
+        assertThrows(InvalidDailyCodeException.class, () -> kioskService.validateEmployeeDailyCode(aliceId, "wrong_code"));
     }
 
     @Test

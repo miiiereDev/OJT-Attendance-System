@@ -71,16 +71,20 @@ public class DatabaseOperationsTest {
     }
 
     @Test
-    public void testDailyCodes() throws SQLException {
-        Date today = new Date(System.currentTimeMillis());
-        dbOps.setDailyCode("98765", today);
+    public void testEmployeeDailyCodes() throws SQLException {
+        Employee alice = dbOps.getEmployeeByCode("EMP-001");
+        assertNotNull(alice);
+        int aliceId = alice.getId();
 
-        String code = dbOps.getDailyCode(today);
+        Date today = new Date(System.currentTimeMillis());
+        dbOps.setEmployeeDailyCode(aliceId, "98765", today);
+
+        String code = dbOps.getEmployeeDailyCode(aliceId, today);
         assertEquals("98765", code);
 
         // Update it
-        dbOps.setDailyCode("54321", today);
-        code = dbOps.getDailyCode(today);
+        dbOps.setEmployeeDailyCode(aliceId, "54321", today);
+        code = dbOps.getEmployeeDailyCode(aliceId, today);
         assertEquals("54321", code);
     }
 

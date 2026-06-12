@@ -90,25 +90,29 @@ public class AdminService {
     }
 
     /**
-     * Generates a random 5-digit daily verification code for today.
-     *
-     * @return Generated 5-digit code string
-     * @throws SQLException if database access fails
+     * Obtains the daily verification code for a specific employee today.
+     * Auto-generates one if it doesn't exist yet.
      */
-    public String generateDailyCode() throws SQLException {
-        int codeInt = 10000 + random.nextInt(90000); // 10000 to 99999
-        String code = String.valueOf(codeInt);
+    public String getEmployeeCodeForToday(int employeeId) throws SQLException {
         Date today = new Date(System.currentTimeMillis());
-        dbOps.setDailyCode(code, today);
+        String code = dbOps.getEmployeeDailyCode(employeeId, today);
+        if (code == null) {
+            int codeInt = 10000 + random.nextInt(90000);
+            code = String.valueOf(codeInt);
+            dbOps.setEmployeeDailyCode(employeeId, code, today);
+        }
         return code;
     }
 
     /**
-     * Obtains the generated daily code for today.
+     * Resets/regenerates a daily code for a specific employee today.
      */
-    public String getTodayDailyCode() throws SQLException {
+    public String resetEmployeeCode(int employeeId) throws SQLException {
+        int codeInt = 10000 + random.nextInt(90000);
+        String code = String.valueOf(codeInt);
         Date today = new Date(System.currentTimeMillis());
-        return dbOps.getDailyCode(today);
+        dbOps.setEmployeeDailyCode(employeeId, code, today);
+        return code;
     }
 
     /**
