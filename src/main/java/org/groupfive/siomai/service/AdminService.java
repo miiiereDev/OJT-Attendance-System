@@ -1,5 +1,6 @@
 package org.groupfive.siomai.service;
 
+import org.groupfive.siomai.database.CachedDatabaseOperations;
 import org.groupfive.siomai.database.DatabaseOperations;
 import org.groupfive.siomai.database.DatabaseOperationsImpl;
 import org.groupfive.siomai.database.DatabaseConnector;
@@ -20,11 +21,15 @@ public class AdminService {
     private final Random random = new Random();
 
     public AdminService() {
-        this.dbOps = new DatabaseOperationsImpl();
+        this.dbOps = new CachedDatabaseOperations(new DatabaseOperationsImpl());
     }
 
     public AdminService(DatabaseOperations dbOps) {
         this.dbOps = dbOps;
+    }
+
+    public DatabaseOperations getDbOps() {
+        return dbOps;
     }
 
     /**

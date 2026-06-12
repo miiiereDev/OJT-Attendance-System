@@ -38,10 +38,12 @@ public class AdminFrame extends JFrame {
     private DefaultTableModel dailyCodeModel;
     private JTable dailyCodeTable;
     private JTextArea reportTextArea;
+    private JLabel syncStatusLabel;
+    private JLabel syncTimeLabel;
 
     public AdminFrame(JFrame parent) {
         this.parent = parent;
-        setTitle("Admin Control Portal");
+        setTitle("OJT Admin Control Portal");
         setSize(950, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
@@ -102,12 +104,34 @@ public class AdminFrame extends JFrame {
             parent.setVisible(true);
         });
 
+        // Sync Status Panel (bottom of sidebar)
+        JPanel syncPanel = new JPanel();
+        syncPanel.setLayout(new BoxLayout(syncPanel, BoxLayout.Y_AXIS));
+        syncPanel.setOpaque(false);
+        syncPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        syncStatusLabel = new JLabel("● Synced");
+        syncStatusLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        syncStatusLabel.setForeground(new Color(46, 204, 113)); // ACCENT_GREEN equivalent
+        syncStatusLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        syncTimeLabel = new JLabel("Last Sync: Just Now");
+        syncTimeLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        syncTimeLabel.setForeground(TEXT_MUTED);
+        syncTimeLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        syncPanel.add(syncStatusLabel);
+        syncPanel.add(Box.createRigidArea(new Dimension(0, 3)));
+        syncPanel.add(syncTimeLabel);
+
         sidebar.add(btnDirectory);
         sidebar.add(Box.createRigidArea(new Dimension(0, 15)));
         sidebar.add(btnCodeCenter);
         sidebar.add(Box.createRigidArea(new Dimension(0, 15)));
         sidebar.add(btnReports);
         sidebar.add(Box.createVerticalGlue());
+        sidebar.add(syncPanel);
+        sidebar.add(Box.createRigidArea(new Dimension(0, 20)));
         sidebar.add(btnLogout);
 
         // Staging cards
@@ -117,6 +141,40 @@ public class AdminFrame extends JFrame {
 
         // Refresh initially
         refreshEmployeeTable();
+
+        // Timer to update sync indicators & auto-refresh UI
+        final long[] lastSeenSyncTime = {System.currentTimeMillis()};
+        new Timer(2000, e -> {
+            if (adminService.getDbOps() instanceof org.groupfive.siomai.database.CachedDatabaseOperations) {
+                org.groupfive.siomai.database.CachedDatabaseOperations cachedOps =
+                        (org.groupfive.siomai.database.CachedDatabaseOperations) adminService.getDbOps();
+
+                if (cachedOps.isSyncing()) {
+                    syncStatusLabel.setText("↻ Syncing...");
+                    syncStatusLabel.setForeground(new Color(230, 126, 34)); // Orange
+                } else {
+                    syncStatusLabel.setText("● Synced");
+                    syncStatusLabel.setForeground(new Color(46, 204, 113));
+                }
+
+                long currentSyncTime = cachedOps.getLastSyncTime();
+                if (currentSyncTime > lastSeenSyncTime[0]) {
+                    lastSeenSyncTime[0] = currentSyncTime;
+                    
+                    // Automatically reload tables with fresh cached values
+                    refreshEmployeeTable();
+                    refreshDailyCode();
+                    refreshReport();
+                }
+
+                long elapsedSec = (System.currentTimeMillis() - currentSyncTime) / 1000;
+                if (elapsedSec < 5) {
+                    syncTimeLabel.setText("Last Sync: Just Now");
+                } else {
+                    syncTimeLabel.setText("Last Sync: " + elapsedSec + "s ago");
+                }
+            }
+        }).start();
     }
 
     private JButton createSidebarButton(String text) {
@@ -324,7 +382,22 @@ public class AdminFrame extends JFrame {
         });
 
         JButton refreshBtn = createActionButton("Refresh List", CARD_BG);
-        refreshBtn.addActionListener(e -> refreshDailyCode());
+        refreshBtn.addActionListener(e -> {
+            if (adminService.getDbOps() instanceof org.groupfive.siomai.database.CachedDatabaseOperations) {
+                org.groupfive.siomai.database.CachedDatabaseOperations cachedOps =
+                        (org.groupfive.siomai.database.CachedDatabaseOperations) adminService.getDbOps();
+                boolean triggered = cachedOps.forceRefresh();
+                if (triggered) {
+                    syncStatusLabel.setText("↻ Syncing...");
+                    syncStatusLabel.setForeground(new Color(230, 126, 34)); // Orange
+                } else {
+                    JOptionPane.showMessageDialog(this, "Please wait at least 5 seconds between manual syncs.",
+                            "Cooldown Active", JOptionPane.WARNING_MESSAGE);
+                }
+            } else {
+                refreshDailyCode();
+            }
+        });
 
         controlPanel.add(resetBtn);
         controlPanel.add(refreshBtn);
@@ -405,7 +478,7 @@ public class AdminFrame extends JFrame {
             return;
         }
         try {
-            List<Employee> list = new DatabaseOperationsImpl().searchEmployees(query.trim());
+            List<Employee> list = adminService.getDbOps().searchEmployees(query.trim());
             updateTableData(list);
         } catch (SQLException e) {
             JOptionPane.showMessageDialog(this, "Search error: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);

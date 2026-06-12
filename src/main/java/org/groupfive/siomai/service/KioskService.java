@@ -1,5 +1,6 @@
 package org.groupfive.siomai.service;
 
+import org.groupfive.siomai.database.CachedDatabaseOperations;
 import org.groupfive.siomai.database.DatabaseOperations;
 import org.groupfive.siomai.database.DatabaseOperationsImpl;
 import org.groupfive.siomai.exception.EmployeeNotFoundException;
@@ -19,11 +20,15 @@ public class KioskService {
     private final DatabaseOperations dbOps;
 
     public KioskService() {
-        this.dbOps = new DatabaseOperationsImpl();
+        this.dbOps = new CachedDatabaseOperations(new DatabaseOperationsImpl());
     }
 
     public KioskService(DatabaseOperations dbOps) {
         this.dbOps = dbOps;
+    }
+
+    public DatabaseOperations getDbOps() {
+        return dbOps;
     }
 
     /**
@@ -97,7 +102,16 @@ public class KioskService {
     public void validateEmployeeDailyCode(int employeeId, String inputCode) throws InvalidDailyCodeException, SQLException {
         String correctCode = getOrGenerateEmployeeCode(employeeId);
         if (inputCode == null || !correctCode.equals(inputCode.trim())) {
-            throw new InvalidDailyCodeException("Invalid Daily Verification Code!");
+            // Mismatch check bypass cache to verify manual admin resets
+            String freshCode = null;
+            if (dbOps instanceof CachedDatabaseOperations) {
+                freshCode = ((CachedDatabaseOperations) dbOps).getEmployeeDailyCodeDirect(employeeId, new Date(System.currentTimeMillis()));
+            } else {
+                freshCode = dbOps.getEmployeeDailyCode(employeeId, new Date(System.currentTimeMillis()));
+            }
+            if (inputCode == null || freshCode == null || !freshCode.equals(inputCode.trim())) {
+                throw new InvalidDailyCodeException("Invalid Daily Verification Code!");
+            }
         }
     }
 

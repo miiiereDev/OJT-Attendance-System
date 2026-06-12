@@ -1,0 +1,10 @@
+# Database Configuration Profile
+# Set to 'true' to connect to Aiven MySQL, or 'false' to use the local SQLite database fallback
+db.use_mysql=false
+
+# MySQL Connection Settings
+db.mysql.host=YOUR_MYSQL_HOST
+db.mysql.port=3306
+db.mysql.database=YOUR_MYSQL_DATABASE
+db.mysql.username=YOUR_MYSQL_USERNAME
+db.mysql.password=YOUR_MYSQL_PASSWORD

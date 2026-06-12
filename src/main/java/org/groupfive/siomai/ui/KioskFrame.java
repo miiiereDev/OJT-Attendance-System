@@ -42,7 +42,7 @@ public class KioskFrame extends JFrame {
 
     public KioskFrame(JFrame parent) {
         this.parent = parent;
-        setTitle("Employee Attendance Kiosk");
+        setTitle("OJT Attendance Kiosk");
         setUndecorated(true);
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
@@ -70,6 +70,65 @@ public class KioskFrame extends JFrame {
         kioskTitle.setForeground(TEXT_MUTED);
         headerPanel.add(kioskTitle, BorderLayout.WEST);
 
+        // Right header container
+        JPanel rightHeader = new JPanel(new FlowLayout(FlowLayout.RIGHT, 25, 0));
+        rightHeader.setOpaque(false);
+
+        // Sync Status Panel
+        JPanel syncPanel = new JPanel();
+        syncPanel.setLayout(new BoxLayout(syncPanel, BoxLayout.Y_AXIS));
+        syncPanel.setOpaque(false);
+
+        JLabel syncStatusLabel = new JLabel("● Synced");
+        syncStatusLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        syncStatusLabel.setForeground(ACCENT_GREEN);
+
+        JLabel syncTimeLabel = new JLabel("Last Sync: Just Now");
+        syncTimeLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        syncTimeLabel.setForeground(TEXT_MUTED);
+
+        JButton syncBtn = new JButton("Sync Data");
+        syncBtn.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        syncBtn.setForeground(TEXT_PRIMARY);
+        syncBtn.setBackground(BUTTON_BG);
+        syncBtn.setFocusPainted(false);
+        syncBtn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(55, 68, 92), 1, true),
+                BorderFactory.createEmptyBorder(4, 10, 4, 10)
+        ));
+        syncBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        syncBtn.addActionListener(e -> {
+            if (kioskService.getDbOps() instanceof org.groupfive.siomai.database.CachedDatabaseOperations) {
+                org.groupfive.siomai.database.CachedDatabaseOperations cachedOps =
+                        (org.groupfive.siomai.database.CachedDatabaseOperations) kioskService.getDbOps();
+                boolean triggered = cachedOps.forceRefresh();
+                if (triggered) {
+                    syncStatusLabel.setText("↻ Syncing...");
+                    syncStatusLabel.setForeground(new Color(230, 126, 34)); // Orange
+                } else {
+                    JOptionPane.showMessageDialog(this, "Please wait at least 5 seconds between manual syncs.",
+                            "Cooldown Active", JOptionPane.WARNING_MESSAGE);
+                }
+            }
+        });
+
+        syncBtn.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                syncBtn.setBackground(BUTTON_BG.brighter());
+            }
+            @Override
+            public void mouseExited(MouseEvent e) {
+                syncBtn.setBackground(BUTTON_BG);
+            }
+        });
+
+        syncPanel.add(syncStatusLabel);
+        syncPanel.add(Box.createRigidArea(new Dimension(0, 3)));
+        syncPanel.add(syncTimeLabel);
+        syncPanel.add(Box.createRigidArea(new Dimension(0, 5)));
+        syncPanel.add(syncBtn);
+
         // Live Clock Panel
         JPanel clockPanel = new JPanel(new GridLayout(2, 1));
         clockPanel.setOpaque(false);
@@ -81,11 +140,44 @@ public class KioskFrame extends JFrame {
         dateLabel.setForeground(TEXT_MUTED);
         clockPanel.add(timeLabel);
         clockPanel.add(dateLabel);
-        headerPanel.add(clockPanel, BorderLayout.EAST);
+
+        rightHeader.add(syncPanel);
+        rightHeader.add(clockPanel);
+        headerPanel.add(rightHeader, BorderLayout.EAST);
         root.add(headerPanel, BorderLayout.NORTH);
 
         // Run Live Clock timer
         runClock(timeLabel, dateLabel);
+
+        // Timer to update sync indicators & auto-refresh UI
+        final long[] lastSeenSyncTime = {System.currentTimeMillis()};
+        new Timer(2000, e -> {
+            if (kioskService.getDbOps() instanceof org.groupfive.siomai.database.CachedDatabaseOperations) {
+                org.groupfive.siomai.database.CachedDatabaseOperations cachedOps =
+                        (org.groupfive.siomai.database.CachedDatabaseOperations) kioskService.getDbOps();
+
+                if (cachedOps.isSyncing()) {
+                    syncStatusLabel.setText("↻ Syncing...");
+                    syncStatusLabel.setForeground(new Color(230, 126, 34));
+                } else {
+                    syncStatusLabel.setText("● Synced");
+                    syncStatusLabel.setForeground(ACCENT_GREEN);
+                }
+
+                long currentSyncTime = cachedOps.getLastSyncTime();
+                if (currentSyncTime > lastSeenSyncTime[0]) {
+                    lastSeenSyncTime[0] = currentSyncTime;
+                    refreshActiveEmployees(); // Refresh items in selector!
+                }
+
+                long elapsedSec = (System.currentTimeMillis() - currentSyncTime) / 1000;
+                if (elapsedSec < 5) {
+                    syncTimeLabel.setText("Last Sync: Just Now");
+                } else {
+                    syncTimeLabel.setText("Last Sync: " + elapsedSec + "s ago");
+                }
+            }
+        }).start();
 
         // Center card container
         JPanel centerPanel = new JPanel(new GridBagLayout());

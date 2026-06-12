@@ -44,4 +44,4 @@ SDLC.md
 # Database & Build artifacts
 *.db
 dependency-reduced-pom.xml
-db.properties
+/db.properties

@@ -24,7 +24,7 @@ public class LauncherFrame extends JFrame {
     private final AdminService adminService = new AdminService();
 
     public LauncherFrame() {
-        setTitle("Attendance System Portal");
+        setTitle("OJT Attendance System Portal");
         setSize(800, 500);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
@@ -39,7 +39,7 @@ public class LauncherFrame extends JFrame {
         // Header Panel
         JPanel header = new JPanel(new GridLayout(2, 1, 5, 5));
         header.setOpaque(false);
-        JLabel title = new JLabel("EMPLOYEE ATTENDANCE SYSTEM", JLabel.CENTER);
+        JLabel title = new JLabel("OJT ATTENDANCE SYSTEM", JLabel.CENTER);
         title.setFont(new Font("Segoe UI", Font.BOLD, 28));
         title.setForeground(TEXT_PRIMARY);
         JLabel subtitle = new JLabel("Select a portal workspace to continue", JLabel.CENTER);

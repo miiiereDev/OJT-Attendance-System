@@ -1,5 +1,7 @@
 package org.groupfive.siomai.database;
 
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -17,17 +19,58 @@ public class DatabaseConnector {
     private static final String PROPERTIES_FILE = "db.properties";
     private static final String SQLITE_DB_NAME = "attendance.db";
     private static Properties properties = new Properties();
+    private static HikariDataSource hikariDataSource = null;
 
     static {
-        // Load properties file if it exists
+        // 1. Load default properties from classpath (packaged inside JAR)
+        try (java.io.InputStream is = DatabaseConnector.class.getClassLoader().getResourceAsStream(PROPERTIES_FILE)) {
+            if (is != null) {
+                properties.load(is);
+            }
+        } catch (IOException e) {
+            // Ignore classpath load errors
+        }
+
+        // 2. Load overriding properties from file system (working directory)
         File file = new File(PROPERTIES_FILE);
         if (file.exists()) {
             try (FileInputStream fis = new FileInputStream(file)) {
                 properties.load(fis);
             } catch (IOException e) {
-                System.err.println("Warning: Could not load db.properties: " + e.getMessage());
+                System.err.println("Warning: Could not load db.properties from file system: " + e.getMessage());
             }
         }
+    }
+
+    private static synchronized HikariDataSource getDataSource() throws SQLException {
+        if (hikariDataSource == null) {
+            String host = properties.getProperty("db.mysql.host", "mysql-siomaidb-employee-attendance-db.e.aivencloud.com");
+            String port = properties.getProperty("db.mysql.port", "13057");
+            String name = properties.getProperty("db.mysql.database", "defaultdb");
+            String user = properties.getProperty("db.mysql.username", "root");
+            String pass = properties.getProperty("db.mysql.password", "");
+            String url = String.format("jdbc:mysql://%s:%s/%s?useSSL=true&trustServerCertificate=true&allowPublicKeyRetrieval=true", host, port, name);
+
+            HikariConfig config = new HikariConfig();
+            config.setJdbcUrl(url);
+            config.setUsername(user);
+            config.setPassword(pass);
+            config.setDriverClassName("com.mysql.cj.jdbc.Driver");
+            
+            // Connection pool tuning
+            config.setMaximumPoolSize(10);
+            config.setMinimumIdle(2);
+            config.setIdleTimeout(300000); // 5 mins
+            config.setConnectionTimeout(10000); // 10 secs
+            
+            hikariDataSource = new HikariDataSource(config);
+
+            // Initialize DB tables once on pool creation
+            try (Connection conn = hikariDataSource.getConnection()) {
+                initializeMySQLDatabase(conn);
+            }
+        }
+        return hikariDataSource;
     }
 
     /**
@@ -53,24 +96,7 @@ public class DatabaseConnector {
     }
 
     private static Connection getMySQLConnection() throws SQLException {
-        try {
-            Class.forName("com.mysql.cj.jdbc.Driver");
-        } catch (ClassNotFoundException e) {
-            throw new SQLException("MySQL JDBC Driver not found", e);
-        }
-
-        String host = properties.getProperty("db.mysql.host", "mysql-siomaidb-employee-attendance-db.e.aivencloud.com");
-        String port = properties.getProperty("db.mysql.port", "13057");
-        String name = properties.getProperty("db.mysql.database", "defaultdb");
-        String user = properties.getProperty("db.mysql.username", "root");
-        String pass = properties.getProperty("db.mysql.password", "");
-
-        String url = String.format("jdbc:mysql://%s:%s/%s?useSSL=true&trustServerCertificate=true&allowPublicKeyRetrieval=true", host, port, name);
-        Connection conn = DriverManager.getConnection(url, user, pass);
-
-        initializeMySQLDatabase(conn);
-
-        return conn;
+        return getDataSource().getConnection();
     }
 
     private static Connection getSQLiteConnection() throws SQLException {
