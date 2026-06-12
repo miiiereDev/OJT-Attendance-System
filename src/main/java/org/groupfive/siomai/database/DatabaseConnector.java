@@ -66,7 +66,13 @@ public class DatabaseConnector {
         String pass = properties.getProperty("db.mysql.password", "");
 
         String url = String.format("jdbc:mysql://%s:%s/%s?useSSL=true&trustServerCertificate=true&allowPublicKeyRetrieval=true", host, port, name);
-        return DriverManager.getConnection(url, user, pass);
+        Connection conn = DriverManager.getConnection(url, user, pass);
+
+        if (!checkIfMySQLTableExists(conn)) {
+            initializeMySQLDatabase(conn);
+        }
+
+        return conn;
     }
 
     private static Connection getSQLiteConnection() throws SQLException {
@@ -137,6 +143,68 @@ public class DatabaseConnector {
                     "clock_out TEXT NULL," +
                     "log_date TEXT NOT NULL DEFAULT (date('now'))," +
                     "work_hours REAL DEFAULT 0.0," +
+                    "FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE" +
+                    ");");
+        }
+    }
+
+    private static boolean checkIfMySQLTableExists(Connection conn) {
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeQuery("SELECT 1 FROM admins LIMIT 1");
+            return true;
+        } catch (SQLException e) {
+            return false;
+        }
+    }
+
+    private static void initializeMySQLDatabase(Connection conn) throws SQLException {
+        try (Statement stmt = conn.createStatement()) {
+            // 1. Admins Table
+            stmt.execute("CREATE TABLE IF NOT EXISTS admins (" +
+                    "id INT AUTO_INCREMENT PRIMARY KEY," +
+                    "username VARCHAR(50) UNIQUE NOT NULL," +
+                    "password VARCHAR(255) NOT NULL," +
+                    "full_name VARCHAR(100) NOT NULL" +
+                    ");");
+
+            // Seed Default Admin (only if empty)
+            stmt.execute("INSERT IGNORE INTO admins (id, username, password, full_name) " +
+                    "VALUES (1, 'admin', 'admin123', 'System Administrator');");
+
+            // 2. Employees Table
+            stmt.execute("CREATE TABLE IF NOT EXISTS employees (" +
+                    "id INT AUTO_INCREMENT PRIMARY KEY," +
+                    "employee_code VARCHAR(20) UNIQUE NOT NULL," +
+                    "full_name VARCHAR(100) NOT NULL," +
+                    "department VARCHAR(50) NOT NULL," +
+                    "is_active BOOLEAN DEFAULT TRUE" +
+                    ");");
+
+            // Seed Test Employees (only if empty)
+            stmt.execute("INSERT IGNORE INTO employees (id, employee_code, full_name, department) VALUES " +
+                    "(1, 'EMP-001', 'Alice Smith', 'Engineering')," +
+                    "(2, 'EMP-002', 'Bob Jones', 'Human Resources')," +
+                    "(3, 'EMP-003', 'Charlie Brown', 'Design');");
+
+            // 3. Daily Verification Codes Table
+            stmt.execute("CREATE TABLE IF NOT EXISTS daily_codes (" +
+                    "id INT AUTO_INCREMENT PRIMARY KEY," +
+                    "validation_code VARCHAR(10) NOT NULL," +
+                    "generated_date DATE UNIQUE NOT NULL DEFAULT (CURRENT_DATE)" +
+                    ");");
+
+            // Seed initial code for today
+            stmt.execute("INSERT IGNORE INTO daily_codes (id, validation_code, generated_date) " +
+                    "VALUES (1, '12345', CURRENT_DATE);");
+
+            // 4. Attendance Logs Table
+            stmt.execute("CREATE TABLE IF NOT EXISTS attendance_logs (" +
+                    "id INT AUTO_INCREMENT PRIMARY KEY," +
+                    "employee_id INT NOT NULL," +
+                    "clock_in TIMESTAMP NULL," +
+                    "clock_out TIMESTAMP NULL," +
+                    "log_date DATE NOT NULL DEFAULT (CURRENT_DATE)," +
+                    "work_hours DOUBLE DEFAULT 0.0," +
                     "FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE" +
                     ");");
         }
