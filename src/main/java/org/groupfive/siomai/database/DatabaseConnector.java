@@ -59,13 +59,13 @@ public class DatabaseConnector {
             throw new SQLException("MySQL JDBC Driver not found", e);
         }
 
-        String host = properties.getProperty("db.mysql.host", "localhost");
-        String port = properties.getProperty("db.mysql.port", "3306");
-        String name = properties.getProperty("db.mysql.database", "attendance_monitoring");
+        String host = properties.getProperty("db.mysql.host", "mysql-siomaidb-employee-attendance-db.e.aivencloud.com");
+        String port = properties.getProperty("db.mysql.port", "13057");
+        String name = properties.getProperty("db.mysql.database", "defaultdb");
         String user = properties.getProperty("db.mysql.username", "root");
         String pass = properties.getProperty("db.mysql.password", "");
 
-        String url = String.format("jdbc:mysql://%s:%s/%s?useSSL=false&allowPublicKeyRetrieval=true", host, port, name);
+        String url = String.format("jdbc:mysql://%s:%s/%s?useSSL=true&trustServerCertificate=true&allowPublicKeyRetrieval=true", host, port, name);
         return DriverManager.getConnection(url, user, pass);
     }
 
