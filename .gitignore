@@ -40,3 +40,7 @@ build/
 
 ### Notes ###
 SDLC.md
+
+# Database & Build artifacts
+*.db
+dependency-reduced-pom.xml
