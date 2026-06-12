@@ -33,6 +33,12 @@ public class DatabaseOperationsTest {
 
     @Test
     public void testEmployeeCRUDAndSearch() throws SQLException {
+        // Clean up pre-existing test employee if any from failed previous runs
+        Employee existing = dbOps.getEmployeeByCode("EMP-999");
+        if (existing != null) {
+            dbOps.deleteEmployee(existing.getId());
+        }
+
         // Create
         Employee emp = new Employee(0, "Test Developer", "EMP-999", "Engineering", true);
         dbOps.addEmployee(emp);

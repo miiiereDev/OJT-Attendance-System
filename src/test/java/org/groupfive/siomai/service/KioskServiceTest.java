@@ -56,6 +56,12 @@ public class KioskServiceTest {
 
     @Test
     public void testProcessAttendance() throws SQLException, EmployeeNotFoundException {
+        // Clean up pre-existing test employee if any from failed previous runs
+        Employee existing = dbOps.getEmployeeByCode("EMP-TEMP");
+        if (existing != null) {
+            dbOps.deleteEmployee(existing.getId());
+        }
+
         // Create a temporary employee for clean flow testing
         Employee tempEmp = new Employee(0, "Kiosk Tester", "EMP-TEMP", "QA", true);
         dbOps.addEmployee(tempEmp);
