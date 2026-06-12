@@ -211,12 +211,13 @@ public class DatabaseOperationsImpl implements DatabaseOperations {
                 if (rs.next()) {
                     Timestamp clockOut = rs.getTimestamp("clock_out");
                     Timestamp clockIn = rs.getTimestamp("clock_in");
+                    Date logDate = rs.getString("log_date") != null ? Date.valueOf(rs.getString("log_date")) : null;
                     return new AttendanceRecord(
                         rs.getInt("id"),
                         rs.getInt("employee_id"),
                         clockIn,
                         clockOut,
-                        rs.getDate("log_date"),
+                        logDate,
                         rs.getDouble("work_hours")
                     );
                 }
@@ -267,12 +268,13 @@ public class DatabaseOperationsImpl implements DatabaseOperations {
                 while (rs.next()) {
                     Timestamp clockOut = rs.getTimestamp("clock_out");
                     Timestamp clockIn = rs.getTimestamp("clock_in");
+                    Date logDate = rs.getString("log_date") != null ? Date.valueOf(rs.getString("log_date")) : null;
                     list.add(new AttendanceRecord(
                         rs.getInt("id"),
                         rs.getInt("employee_id"),
                         clockIn,
                         clockOut,
-                        rs.getDate("log_date"),
+                        logDate,
                         rs.getDouble("work_hours")
                     ));
                 }
