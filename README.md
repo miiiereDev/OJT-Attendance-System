@@ -1,10 +1,10 @@
 # OJT Attendance System
 
-A high-performance, modular, and visually stunning **OJT (On-the-Job Training) Attendance Monitoring System** built in Java (Swing) utilizing a layered Architecture. It supports connection pooling (via HikariCP), asynchronous background sync polling, local memory caching, and dual-profile database portability (supporting remote Aiven MySQL over SSL and local SQLite fallback).
+A high-performance modular **OJT Attendance Monitoring System** built in Java (Swing) utilizing a layered Architecture. It supports connection pooling (via HikariCP), asynchronous background sync polling, local memory caching, and dual-profile database portability (supporting remote Aiven MySQL over SSL and local SQLite fallback).
 
 ---
 
-## 🚀 Key Features
+##  Key Features
 1. **Interactive Launcher**: A splash landing screen to run either the **Employee Kiosk** or **Admin Control Portal**.
 2. **Employee Kiosk Mode**: 
    - **Interactive Selector**: Real-time fuzzy filtering dropdown (JComboBox) matching employees by name or code as they type.
@@ -23,7 +23,7 @@ A high-performance, modular, and visually stunning **OJT (On-the-Job Training) A
 
 ---
 
-## 🗄️ Database Structure & Schema
+##  Database Structure & Schema
 
 The system automatically initializes the database schema on startup. Below are the definitions for the tables:
 
@@ -219,7 +219,7 @@ Below are the exact SQL queries executed by `DatabaseOperationsImpl` for every f
 ---
 
 
-## 📂 Class-by-Class Documentation
+##  Class-by-Class Documentation
 
 ### 1. Database & Infrastructure Layer
 - **`DatabaseConnector.java`**: Manages SQL connection pools using HikariCP for MySQL, or sets up a local SQLite connection fallback. Runs schema initializations once upon connection pool setup.
@@ -250,7 +250,7 @@ Below are the exact SQL queries executed by `DatabaseOperationsImpl` for every f
 
 ---
 
-## 🔒 Security & Connection Setup
+##  Security & Connection Setup
 
 To prevent database connection credentials and passwords from leaking in public repositories, a `.gitignore` rule is configured:
 - `/db.properties` at the root folder is ignored by git.
@@ -275,7 +275,7 @@ To configure your own remote database:
 
 ---
 
-## 🛠️ Build & Run Instructions
+##  Build & Run Instructions
 
 ### Prerequisites
 - JDK 21 or higher installed.
