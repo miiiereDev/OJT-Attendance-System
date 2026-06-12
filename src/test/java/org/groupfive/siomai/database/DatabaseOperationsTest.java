@@ -93,9 +93,10 @@ public class DatabaseOperationsTest {
         Date today = new Date(System.currentTimeMillis());
 
         // Clean any potential pre-existing log for testing
-        AttendanceRecord existing = dbOps.getTodayAttendanceRecord(alice.getId(), today);
-        if (existing != null) {
-            // Delete log/recreate environment or we can just run the logic cleanly
+        try (Connection conn = DatabaseConnector.getConnection();
+             java.sql.PreparedStatement ps = conn.prepareStatement("DELETE FROM attendance_logs WHERE employee_id = ?")) {
+            ps.setInt(1, alice.getId());
+            ps.executeUpdate();
         }
 
         // Clock In
