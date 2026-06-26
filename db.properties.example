@@ -1,10 +1,14 @@
 # Database Configuration Profile
-# Set to 'true' to connect to Aiven MySQL, or 'false' to use the local SQLite database fallback
+# Set to 'true' to connect to MySQL database, or 'false' to use the local SQLite database fallback (default)
 db.use_mysql=false
 
 # MySQL Connection Settings
-db.mysql.host=YOUR_MYSQL_HOST
+db.mysql.host=localhost
 db.mysql.port=3306
-db.mysql.database=YOUR_MYSQL_DATABASE
-db.mysql.username=YOUR_MYSQL_USERNAME
-db.mysql.password=YOUR_MYSQL_PASSWORD
+db.mysql.database=siomai
+db.mysql.username=root
+db.mysql.password=
+
+# SSL Configuration (Use 'false' for typical local MySQL database hosts, or 'true' for secure cloud setups like Aiven/AWS RDS)
+db.mysql.use_ssl=false
+

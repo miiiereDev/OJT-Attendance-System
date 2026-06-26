@@ -22,16 +22,7 @@ public class DatabaseConnector {
     private static HikariDataSource hikariDataSource = null;
 
     static {
-        // 1. Load default properties from classpath (packaged inside JAR)
-        try (java.io.InputStream is = DatabaseConnector.class.getClassLoader().getResourceAsStream(PROPERTIES_FILE)) {
-            if (is != null) {
-                properties.load(is);
-            }
-        } catch (IOException e) {
-            // Ignore classpath load errors
-        }
-
-        // 2. Load overriding properties from file system (working directory)
+        // Load properties from the file system (root working directory)
         File file = new File(PROPERTIES_FILE);
         if (file.exists()) {
             try (FileInputStream fis = new FileInputStream(file)) {
@@ -39,17 +30,20 @@ public class DatabaseConnector {
             } catch (IOException e) {
                 System.err.println("Warning: Could not load db.properties from file system: " + e.getMessage());
             }
+        } else {
+            System.out.println("Info: " + PROPERTIES_FILE + " not found at project root. Using default local SQLite database configuration.");
         }
     }
 
     private static synchronized HikariDataSource getDataSource() throws SQLException {
         if (hikariDataSource == null) {
-            String host = properties.getProperty("db.mysql.host", "mysql-siomaidb-employee-attendance-db.e.aivencloud.com");
-            String port = properties.getProperty("db.mysql.port", "13057");
-            String name = properties.getProperty("db.mysql.database", "defaultdb");
+            String host = properties.getProperty("db.mysql.host", "localhost");
+            String port = properties.getProperty("db.mysql.port", "3306");
+            String name = properties.getProperty("db.mysql.database", "siomai");
             String user = properties.getProperty("db.mysql.username", "root");
             String pass = properties.getProperty("db.mysql.password", "");
-            String url = String.format("jdbc:mysql://%s:%s/%s?useSSL=true&trustServerCertificate=true&allowPublicKeyRetrieval=true", host, port, name);
+            String useSSL = properties.getProperty("db.mysql.use_ssl", "false");
+            String url = String.format("jdbc:mysql://%s:%s/%s?useSSL=%s&trustServerCertificate=true&allowPublicKeyRetrieval=true", host, port, name, useSSL);
 
             HikariConfig config = new HikariConfig();
             config.setJdbcUrl(url);
