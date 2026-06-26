@@ -163,7 +163,7 @@ public class DatabaseOperationsImpl implements DatabaseOperations {
         String sql = "SELECT validation_code FROM daily_codes WHERE generated_date = ?";
         try (Connection conn = DatabaseConnector.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setDate(1, date);
+            setDateHelper(ps, 1, date, conn);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return rs.getString("validation_code");
@@ -179,20 +179,20 @@ public class DatabaseOperationsImpl implements DatabaseOperations {
         String selectSql = "SELECT id FROM daily_codes WHERE generated_date = ?";
         try (Connection conn = DatabaseConnector.getConnection();
              PreparedStatement psSelect = conn.prepareStatement(selectSql)) {
-            psSelect.setDate(1, date);
+            setDateHelper(psSelect, 1, date, conn);
             try (ResultSet rs = psSelect.executeQuery()) {
                 if (rs.next()) {
                     String updateSql = "UPDATE daily_codes SET validation_code = ? WHERE generated_date = ?";
                     try (PreparedStatement psUpdate = conn.prepareStatement(updateSql)) {
                         psUpdate.setString(1, code);
-                        psUpdate.setDate(2, date);
+                        setDateHelper(psUpdate, 2, date, conn);
                         psUpdate.executeUpdate();
                     }
                 } else {
                     String insertSql = "INSERT INTO daily_codes (validation_code, generated_date) VALUES (?, ?)";
                     try (PreparedStatement psInsert = conn.prepareStatement(insertSql)) {
                         psInsert.setString(1, code);
-                        psInsert.setDate(2, date);
+                        setDateHelper(psInsert, 2, date, conn);
                         psInsert.executeUpdate();
                     }
                 }
@@ -206,7 +206,7 @@ public class DatabaseOperationsImpl implements DatabaseOperations {
         try (Connection conn = DatabaseConnector.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, employeeId);
-            ps.setDate(2, date);
+            setDateHelper(ps, 2, date, conn);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     Timestamp clockOut = rs.getTimestamp("clock_out");
@@ -232,9 +232,9 @@ public class DatabaseOperationsImpl implements DatabaseOperations {
         try (Connection conn = DatabaseConnector.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, record.getEmployeeId());
-            ps.setTimestamp(2, record.getClockIn());
-            ps.setTimestamp(3, record.getClockOut());
-            ps.setDate(4, record.getLogDate() != null ? record.getLogDate() : new Date(System.currentTimeMillis()));
+            setTimestampHelper(ps, 2, record.getClockIn(), conn);
+            setTimestampHelper(ps, 3, record.getClockOut(), conn);
+            setDateHelper(ps, 4, record.getLogDate() != null ? record.getLogDate() : new Date(System.currentTimeMillis()), conn);
             ps.setDouble(5, record.getWorkHours());
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -250,7 +250,7 @@ public class DatabaseOperationsImpl implements DatabaseOperations {
         String sql = "UPDATE attendance_logs SET clock_out = ?, work_hours = ? WHERE id = ?";
         try (Connection conn = DatabaseConnector.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setTimestamp(1, record.getClockOut());
+            setTimestampHelper(ps, 1, record.getClockOut(), conn);
             ps.setDouble(2, record.getWorkHours());
             ps.setInt(3, record.getId());
             ps.executeUpdate();
@@ -263,7 +263,7 @@ public class DatabaseOperationsImpl implements DatabaseOperations {
         List<AttendanceRecord> list = new ArrayList<>();
         try (Connection conn = DatabaseConnector.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setDate(1, date);
+            setDateHelper(ps, 1, date, conn);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     Timestamp clockOut = rs.getTimestamp("clock_out");
@@ -288,7 +288,7 @@ public class DatabaseOperationsImpl implements DatabaseOperations {
         try (Connection conn = DatabaseConnector.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, employeeId);
-            ps.setDate(2, date);
+            setDateHelper(ps, 2, date, conn);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return rs.getString("validation_code");
@@ -304,14 +304,14 @@ public class DatabaseOperationsImpl implements DatabaseOperations {
         try (Connection conn = DatabaseConnector.getConnection();
              PreparedStatement psSelect = conn.prepareStatement(selectSql)) {
             psSelect.setInt(1, employeeId);
-            psSelect.setDate(2, date);
+            setDateHelper(psSelect, 2, date, conn);
             try (ResultSet rs = psSelect.executeQuery()) {
                 if (rs.next()) {
                     String updateSql = "UPDATE employee_daily_codes SET validation_code = ? WHERE employee_id = ? AND generated_date = ?";
                     try (PreparedStatement psUpdate = conn.prepareStatement(updateSql)) {
                         psUpdate.setString(1, code);
                         psUpdate.setInt(2, employeeId);
-                        psUpdate.setDate(3, date);
+                        setDateHelper(psUpdate, 3, date, conn);
                         psUpdate.executeUpdate();
                     }
                 } else {
@@ -319,7 +319,7 @@ public class DatabaseOperationsImpl implements DatabaseOperations {
                     try (PreparedStatement psInsert = conn.prepareStatement(insertSql)) {
                         psInsert.setInt(1, employeeId);
                         psInsert.setString(2, code);
-                        psInsert.setDate(3, date);
+                        setDateHelper(psInsert, 3, date, conn);
                         psInsert.executeUpdate();
                     }
                 }
@@ -365,6 +365,36 @@ public class DatabaseOperationsImpl implements DatabaseOperations {
             return Date.valueOf(dateStr);
         } catch (IllegalArgumentException e) {
             return rs.getDate(columnName);
+        }
+    }
+
+    private boolean isSQLite(Connection conn) throws SQLException {
+        return conn.getMetaData().getDatabaseProductName().equalsIgnoreCase("SQLite");
+    }
+
+    private void setDateHelper(PreparedStatement ps, int parameterIndex, Date date, Connection conn) throws SQLException {
+        if (date == null) {
+            ps.setNull(parameterIndex, java.sql.Types.DATE);
+            return;
+        }
+        if (isSQLite(conn)) {
+            // Store as ISO yyyy-MM-dd string format to match SQLite date functions
+            ps.setString(parameterIndex, date.toString());
+        } else {
+            ps.setDate(parameterIndex, date);
+        }
+    }
+
+    private void setTimestampHelper(PreparedStatement ps, int parameterIndex, Timestamp timestamp, Connection conn) throws SQLException {
+        if (timestamp == null) {
+            ps.setNull(parameterIndex, java.sql.Types.TIMESTAMP);
+            return;
+        }
+        if (isSQLite(conn)) {
+            // Store as ISO string format instead of millisecond bigint to prevent SQLite JDBC parser exceptions
+            ps.setString(parameterIndex, timestamp.toString());
+        } else {
+            ps.setTimestamp(parameterIndex, timestamp);
         }
     }
 }
