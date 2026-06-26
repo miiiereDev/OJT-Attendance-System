@@ -95,9 +95,9 @@ public class DatabaseConnector {
 
     private static Connection getSQLiteConnection() throws SQLException {
         try {
-            Class.forName("org.xerial.sqlite-jdbc");
+            Class.forName("org.sqlite.JDBC");
         } catch (ClassNotFoundException e) {
-            // org.xerial:sqlite-jdbc may not need explicit Class.forName in newer JDBC versions, but good practice
+            System.err.println("Warning: SQLite JDBC Driver class not found: " + e.getMessage());
         }
 
         String url = "jdbc:sqlite:" + SQLITE_DB_NAME;
