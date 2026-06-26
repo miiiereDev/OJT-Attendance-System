@@ -179,7 +179,7 @@ java -jar target/siomai-1.0-SNAPSHOT.jar
 ## 📂 Class-by-Class Documentation
 
 ### 1. Database & Infrastructure Layer
-- **[DatabaseConnector.java](./src/main/java/org/groupfive/siomai/database/DatabaseConnector.java)**: Manages SQL connection pools using HikariCP for MySQL, or sets up a local SQLite connection fallback. Runs schema initializations once upon connection pool setup.
+- **[DatabaseConnector.java](./src/main/java/org/groupfive/siomai/database/DatabaseConnector.java)**: Manages SQL connection pools using HikariCP for MySQL, or sets up a local SQLite connection fallback. Runs schema initializations exactly once per application boot (safeguarded via synchronization and boolean flag).
 - **[DatabaseOperations.java](./src/main/java/org/groupfive/siomai/database/DatabaseOperations.java)**: Interface specifying abstract CRUD operations (Abstraction principle).
 - **[DatabaseOperationsImpl.java](./src/main/java/org/groupfive/siomai/database/DatabaseOperationsImpl.java)**: Implements raw JDBC calls. Handles database updates, queries, and SQLite date parsing helpers.
 - **[CachedDatabaseOperations.java](./src/main/java/org/groupfive/siomai/database/CachedDatabaseOperations.java)**: Cache Decorator wrapping the raw database operations. Manages in-memory maps, background synchronization thread pool (ScheduledExecutorService), async write workers (`CompletableFuture.runAsync()`), manual refresh throttles, and mismatch double-checks.
@@ -204,3 +204,88 @@ java -jar target/siomai-1.0-SNAPSHOT.jar
 - **[AppException.java](./src/main/java/org/groupfive/siomai/exception/AppException.java)**: Base unchecked application exception.
 - **[EmployeeNotFoundException.java](./src/main/java/org/groupfive/siomai/exception/EmployeeNotFoundException.java)**: Thrown when search filters return no matching active employees.
 - **[InvalidDailyCodeException.java](./src/main/java/org/groupfive/siomai/exception/InvalidDailyCodeException.java)**: Thrown when daily code input fails verification.
+
+---
+
+## 🗃️ Database Schema & Query Reference
+
+### 1. Database Schema
+The database uses a relational schema. Below is a layout of each table, matching both SQLite and MySQL definitions:
+
+#### Table: `admins`
+Stores administrative portal login credentials.
+| Column | Type (MySQL / SQLite) | Key / Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `INT` / `INTEGER` | `PRIMARY KEY AUTO_INCREMENT` | Unique identifier for the administrator |
+| `username` | `VARCHAR(50)` / `TEXT` | `UNIQUE NOT NULL` | Administrator login username |
+| `password` | `VARCHAR(255)` / `TEXT` | `NOT NULL` | Text password |
+| `full_name` | `VARCHAR(100)` / `TEXT` | `NOT NULL` | Full name of the administrator |
+
+#### Table: `employees`
+Contains all student trainees/employees under monitoring.
+| Column | Type (MySQL / SQLite) | Key / Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `INT` / `INTEGER` | `PRIMARY KEY AUTO_INCREMENT` | Unique identifier for the employee |
+| `employee_code` | `VARCHAR(20)` / `TEXT` | `UNIQUE NOT NULL` | Business/school code (e.g. `EMP-001`) |
+| `full_name` | `VARCHAR(100)` / `TEXT` | `NOT NULL` | Full name of the employee |
+| `department` | `VARCHAR(50)` / `TEXT` | `NOT NULL` | Assigned department |
+| `is_active` | `BOOLEAN` / `INTEGER` | `DEFAULT TRUE / 1` | Status showing whether employee account is active |
+
+#### Table: `daily_codes`
+Stores the global daily validation verification codes required to clock-in/out or view stats.
+| Column | Type (MySQL / SQLite) | Key / Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `INT` / `INTEGER` | `PRIMARY KEY AUTO_INCREMENT` | Unique identifier for the code record |
+| `validation_code` | `VARCHAR(10)` / `TEXT` | `NOT NULL` | The 5-digit verification code string |
+| `generated_date` | `DATE` / `TEXT` | `UNIQUE NOT NULL DEFAULT CURRENT_DATE` | The specific day the code is generated for |
+
+#### Table: `attendance_logs`
+Saves time card sessions showing daily clock-in and clock-out logs.
+| Column | Type (MySQL / SQLite) | Key / Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `INT` / `INTEGER` | `PRIMARY KEY AUTO_INCREMENT` | Unique identifier for the attendance log |
+| `employee_id` | `INT` / `INTEGER` | `NOT NULL`, `FOREIGN KEY REFERENCES employees(id) ON DELETE CASCADE` | Associated employee ID |
+| `clock_in` | `TIMESTAMP` / `TEXT` | `NULL` | Timestamp when the employee clocked in |
+| `clock_out` | `TIMESTAMP` / `TEXT` | `NULL` | Timestamp when the employee clocked out |
+| `log_date` | `DATE` / `TEXT` | `NOT NULL DEFAULT CURRENT_DATE` | Calendar day of logging |
+| `work_hours` | `DOUBLE` / `REAL` | `DEFAULT 0.0` | Total hours computed for the shift log session |
+
+#### Table: `employee_daily_codes`
+Tracks specific daily codes generated individually per-employee (used if an administrator manually resets a student's daily code).
+| Column | Type (MySQL / SQLite) | Key / Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `INT` / `INTEGER` | `PRIMARY KEY AUTO_INCREMENT` | Unique identifier for the override code |
+| `employee_id` | `INT` / `INTEGER` | `NOT NULL`, `FOREIGN KEY REFERENCES employees(id) ON DELETE CASCADE` | Associated employee ID |
+| `validation_code` | `VARCHAR(10)` / `TEXT` | `NOT NULL` | The custom verification code |
+| `generated_date` | `DATE` / `TEXT` | `NOT NULL` | Target date for the override code |
+| *Constraint* | `UNIQUE(employee_id, generated_date)` | Unique index combination | Ensures only one daily override code exists per day |
+
+---
+
+### 2. Backend SQL Query Catalog
+All backend operations are defined in `DatabaseOperations` and implemented inside `DatabaseOperationsImpl`. The table below lists the SQL queries used and their matching Java method:
+
+| Target Function | SQL Query | Purpose |
+| :--- | :--- | :--- |
+| `getAdminByUsername` | `SELECT * FROM admins WHERE username = ?` | Fetches admin account by username for portal login checks. |
+| `addEmployee` | `INSERT INTO employees (employee_code, full_name, department, is_active) VALUES (?, ?, ?, ?)` | Saves a new employee record into the database. |
+| `getAllEmployees` | `SELECT * FROM employees` | Fetches the complete list of employees to load in directories and dropdown selectors. |
+| `getEmployeeById` | `SELECT * FROM employees WHERE id = ?` | Retrieves an employee by database primary key. |
+| `getEmployeeByCode` | `SELECT * FROM employees WHERE employee_code = ?` | Retrieves an employee by their unique code identifier. |
+| `searchEmployees` | `SELECT * FROM employees WHERE full_name LIKE ? OR employee_code LIKE ?` | Performs live fuzzy filtering searches. |
+| `updateEmployee` | `UPDATE employees SET employee_code = ?, full_name = ?, department = ?, is_active = ? WHERE id = ?` | Persists edited employee details. |
+| `deleteEmployee` | `DELETE FROM employees WHERE id = ?` | Removes employee from directory (deletes related logs/daily codes automatically). |
+| `getDailyCode` | `SELECT validation_code FROM daily_codes WHERE generated_date = ?` | Retrieves the system validation code generated for a specific date. |
+| `setDailyCode` (Check) | `SELECT id FROM daily_codes WHERE generated_date = ?` | Verifies if a global validation code already exists for today. |
+| `setDailyCode` (Update) | `UPDATE daily_codes SET validation_code = ? WHERE generated_date = ?` | Overwrites the validation code for a specific date. |
+| `setDailyCode` (Insert) | `INSERT INTO daily_codes (validation_code, generated_date) VALUES (?, ?)` | Inserts a new global validation code. |
+| `getTodayAttendanceRecord` | `SELECT * FROM attendance_logs WHERE employee_id = ? AND log_date = ?` | Fetches today's log record for clock-in/out checks. |
+| `addAttendanceRecord` | `INSERT INTO attendance_logs (employee_id, clock_in, clock_out, log_date, work_hours) VALUES (?, ?, ?, ?, ?)` | Starts a new attendance session (clock-in). |
+| `updateAttendanceRecord` | `UPDATE attendance_logs SET clock_out = ?, work_hours = ? WHERE id = ?` | Updates and completes an attendance session (clock-out). |
+| `getAttendanceLogsForDate` | `SELECT * FROM attendance_logs WHERE log_date = ?` | Compiles daily attendance report. |
+| `getEmployeeDailyCode` | `SELECT validation_code FROM employee_daily_codes WHERE employee_id = ? AND generated_date = ?` | Checks if a custom override daily code exists for a student. |
+| `setEmployeeDailyCode` (Check) | `SELECT id FROM employee_daily_codes WHERE employee_id = ? AND generated_date = ?` | Checks if a student override daily code exists. |
+| `setEmployeeDailyCode` (Update) | `UPDATE employee_daily_codes SET validation_code = ? WHERE employee_id = ? AND generated_date = ?` | Overwrites a student's custom override daily code. |
+| `setEmployeeDailyCode` (Insert) | `INSERT INTO employee_daily_codes (employee_id, validation_code, generated_date) VALUES (?, ?, ?)` | Inserts a new custom override daily code for a student. |
+| `getAttendanceLogsForEmployee` | `SELECT * FROM attendance_logs WHERE employee_id = ? ORDER BY log_date DESC, clock_in DESC` | Gathers an employee's historic records to compute shift performance statistics. |
+
