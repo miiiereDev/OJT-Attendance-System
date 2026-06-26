@@ -21,6 +21,7 @@ public class DatabaseConnector {
     private static final String SQLITE_DB_NAME = "attendance.db";
     private static Properties properties = new Properties();
     private static HikariDataSource hikariDataSource = null;
+    private static boolean sqliteInitialized = false;
 
     static {
         // Load properties from the file system (root working directory)
@@ -109,7 +110,12 @@ public class DatabaseConnector {
             stmt.execute("PRAGMA foreign_keys = ON;");
         }
 
-        initializeSQLiteDatabase(conn);
+        synchronized (DatabaseConnector.class) {
+            if (!sqliteInitialized) {
+                initializeSQLiteDatabase(conn);
+                sqliteInitialized = true;
+            }
+        }
         return conn;
     }
 
@@ -123,14 +129,6 @@ public class DatabaseConnector {
                     "full_name TEXT NOT NULL" +
                     ");");
 
-            // Seed Default Admin (only if empty)
-            try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM admins")) {
-                if (rs.next() && rs.getInt(1) == 0) {
-                    stmt.execute("INSERT INTO admins (id, username, password, full_name) " +
-                            "VALUES (1, 'admin', 'admin123', 'System Administrator');");
-                }
-            }
-
             // 2. Employees Table
             stmt.execute("CREATE TABLE IF NOT EXISTS employees (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -140,16 +138,6 @@ public class DatabaseConnector {
                     "is_active INTEGER DEFAULT 1" +
                     ");");
 
-            // Seed Test Employees (only if empty)
-            try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM employees")) {
-                if (rs.next() && rs.getInt(1) == 0) {
-                    stmt.execute("INSERT INTO employees (id, employee_code, full_name, department) VALUES " +
-                            "(1, 'EMP-001', 'Alice Smith', 'Engineering')," +
-                            "(2, 'EMP-002', 'Bob Jones', 'Human Resources')," +
-                            "(3, 'EMP-003', 'Charlie Brown', 'Design');");
-                }
-            }
-
             // 3. Daily Verification Codes Table
             stmt.execute("CREATE TABLE IF NOT EXISTS daily_codes (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -157,12 +145,28 @@ public class DatabaseConnector {
                     "generated_date TEXT UNIQUE NOT NULL DEFAULT (date('now'))" +
                     ");");
 
-            // Seed initial code for today (only if empty)
-            try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM daily_codes")) {
+            // Heuristic check: only seed if the admins table is empty (fresh database creation)
+            boolean needsSeeding = false;
+            try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM admins")) {
                 if (rs.next() && rs.getInt(1) == 0) {
-                    stmt.execute("INSERT INTO daily_codes (id, validation_code, generated_date) " +
-                            "VALUES (1, '12345', date('now'));");
+                    needsSeeding = true;
                 }
+            }
+
+            if (needsSeeding) {
+                // Seed Default Admin
+                stmt.execute("INSERT INTO admins (id, username, password, full_name) " +
+                        "VALUES (1, 'admin', 'admin123', 'System Administrator');");
+
+                // Seed Test Employees
+                stmt.execute("INSERT INTO employees (id, employee_code, full_name, department) VALUES " +
+                        "(1, 'EMP-001', 'Alice Smith', 'Engineering')," +
+                        "(2, 'EMP-002', 'Bob Jones', 'Human Resources')," +
+                        "(3, 'EMP-003', 'Charlie Brown', 'Design');");
+
+                // Seed initial code for today
+                stmt.execute("INSERT INTO daily_codes (id, validation_code, generated_date) " +
+                        "VALUES (1, '12345', date('now'));");
             }
 
             // 4. Attendance Logs Table
@@ -207,14 +211,6 @@ public class DatabaseConnector {
                     "full_name VARCHAR(100) NOT NULL" +
                     ");");
 
-            // Seed Default Admin (only if empty)
-            try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM admins")) {
-                if (rs.next() && rs.getInt(1) == 0) {
-                    stmt.execute("INSERT INTO admins (id, username, password, full_name) " +
-                            "VALUES (1, 'admin', 'admin123', 'System Administrator');");
-                }
-            }
-
             // 2. Employees Table
             stmt.execute("CREATE TABLE IF NOT EXISTS employees (" +
                     "id INT AUTO_INCREMENT PRIMARY KEY," +
@@ -224,16 +220,6 @@ public class DatabaseConnector {
                     "is_active BOOLEAN DEFAULT TRUE" +
                     ");");
 
-            // Seed Test Employees (only if empty)
-            try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM employees")) {
-                if (rs.next() && rs.getInt(1) == 0) {
-                    stmt.execute("INSERT INTO employees (id, employee_code, full_name, department) VALUES " +
-                            "(1, 'EMP-001', 'Alice Smith', 'Engineering')," +
-                            "(2, 'EMP-002', 'Bob Jones', 'Human Resources')," +
-                            "(3, 'EMP-003', 'Charlie Brown', 'Design');");
-                }
-            }
-
             // 3. Daily Verification Codes Table
             stmt.execute("CREATE TABLE IF NOT EXISTS daily_codes (" +
                     "id INT AUTO_INCREMENT PRIMARY KEY," +
@@ -241,12 +227,28 @@ public class DatabaseConnector {
                     "generated_date DATE UNIQUE NOT NULL DEFAULT (CURRENT_DATE)" +
                     ");");
 
-            // Seed initial code for today (only if empty)
-            try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM daily_codes")) {
+            // Heuristic check: only seed if the admins table is empty (fresh database creation)
+            boolean needsSeeding = false;
+            try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM admins")) {
                 if (rs.next() && rs.getInt(1) == 0) {
-                    stmt.execute("INSERT INTO daily_codes (id, validation_code, generated_date) " +
-                            "VALUES (1, '12345', CURRENT_DATE);");
+                    needsSeeding = true;
                 }
+            }
+
+            if (needsSeeding) {
+                // Seed Default Admin
+                stmt.execute("INSERT INTO admins (id, username, password, full_name) " +
+                        "VALUES (1, 'admin', 'admin123', 'System Administrator');");
+
+                // Seed Test Employees
+                stmt.execute("INSERT INTO employees (id, employee_code, full_name, department) VALUES " +
+                        "(1, 'EMP-001', 'Alice Smith', 'Engineering')," +
+                        "(2, 'EMP-002', 'Bob Jones', 'Human Resources')," +
+                        "(3, 'EMP-003', 'Charlie Brown', 'Design');");
+
+                // Seed initial code for today
+                stmt.execute("INSERT INTO daily_codes (id, validation_code, generated_date) " +
+                        "VALUES (1, '12345', CURRENT_DATE);");
             }
 
             // 4. Attendance Logs Table

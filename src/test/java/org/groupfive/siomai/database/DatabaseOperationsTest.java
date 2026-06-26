@@ -125,4 +125,31 @@ public class DatabaseOperationsTest {
         assertNotNull(finalLog.getClockOut());
         assertTrue(finalLog.getWorkHours() >= 7.9, "Work hours should be calculated around 8 hours");
     }
+
+    @Test
+    public void testDeleteAllEmployeesDoesNotReseed() throws SQLException {
+        // Fetch all current employees
+        List<Employee> employees = dbOps.getAllEmployees();
+        // Delete all employees one by one
+        for (Employee e : employees) {
+            dbOps.deleteEmployee(e.getId());
+        }
+        // Verify employees is empty
+        List<Employee> emptyEmployees = dbOps.getAllEmployees();
+        assertTrue(emptyEmployees.isEmpty(), "Employees should be completely empty");
+
+        // Obtain a fresh connection to simulate subsequent requests
+        try (Connection conn = DatabaseConnector.getConnection()) {
+            assertNotNull(conn);
+        }
+
+        // Verify employees remains empty (no auto-reseeding occurred)
+        List<Employee> emptyEmployeesAfterConnection = dbOps.getAllEmployees();
+        assertTrue(emptyEmployeesAfterConnection.isEmpty(), "Employees should remain empty after new connections");
+
+        // Restore default employees for other tests to use
+        dbOps.addEmployee(new Employee(0, "Alice Smith", "EMP-001", "Engineering", true));
+        dbOps.addEmployee(new Employee(0, "Bob Jones", "EMP-002", "Human Resources", true));
+        dbOps.addEmployee(new Employee(0, "Charlie Brown", "EMP-003", "Design", true));
+    }
 }
