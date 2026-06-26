@@ -25,6 +25,13 @@ A high-performance modular **OJT Attendance Monitoring System** built in Java (S
 
 ## 🛠️ Database Setup Guide
 
+> [!IMPORTANT]
+> **Default Administrative Credentials:**
+> - **Username:** `admin`
+> - **Password:** `admin123`
+> 
+> *(These credentials are automatically seeded upon SQLite auto-creation or executing `schema.sql` on MySQL.)*
+
 The application supports dual profiles: **SQLite** (local file-based, zero configuration) and **MySQL** (local or cloud-hosted).
 
 ### Option 1: SQLite (Zero Configuration Quick Start)
