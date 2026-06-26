@@ -123,7 +123,7 @@ git clone https://github.com/miiiereDev/OJT-Attendance-System.git
 ### Step 3: Open the Project Directory
 You must navigate into the folder where the project files are located. **All subsequent commands (like building or running) must be executed inside this folder:**
 ```bash
-cd "OJT Attendance System"
+cd "OJT-Attendance-System"
 ```
 *(Tip: On Windows, you can open this folder in File Explorer, hold `Shift`, right-click on an empty space, and select **"Open PowerShell window here"** or **"Open in Terminal"**).*
 
