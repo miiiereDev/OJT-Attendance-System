@@ -106,6 +106,33 @@ To set up a remote cloud database with SSL enabled:
 
 ---
 
+## 🐣 Newbie Onboarding Guide (Step-by-Step)
+
+If you are new to Git, Java development, or terminal commands, follow these exact steps to get the project running on your machine:
+
+### Step 1: Install Prerequisites
+1. **Java Development Kit (JDK 21):** Download and install JDK 21 (e.g., from [Eclipse Temurin](https://adoptium.net/) or Oracle).
+2. **Git:** Download and install [Git](https://git-scm.com/).
+
+### Step 2: Clone the Repository
+Open your terminal (**Command Prompt** or **PowerShell** on Windows, **Terminal** on macOS/Linux) and run the following command to download the code to your machine:
+```bash
+git clone https://github.com/miiiereDev/OJT-Attendance-System.git
+```
+
+### Step 3: Open the Project Directory
+You must navigate into the folder where the project files are located. **All subsequent commands (like building or running) must be executed inside this folder:**
+```bash
+cd "OJT Attendance System"
+```
+*(Tip: On Windows, you can open this folder in File Explorer, hold `Shift`, right-click on an empty space, and select **"Open PowerShell window here"** or **"Open in Terminal"**).*
+
+### Step 4: Run the Application
+- If you want a quick start with zero setup, read **[Option 1: SQLite](#option-1-sqlite-zero-configuration-quick-start)**.
+- If you want local database storage, follow **[Option 2: Local MySQL](#option-2-local-mysql-setup-recommended-for-development)**.
+
+---
+
 ## 🚀 Build & Run Instructions
 
 ### Prerequisites
