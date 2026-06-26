@@ -7,6 +7,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
@@ -101,8 +102,12 @@ public class DatabaseConnector {
         }
 
         String url = "jdbc:sqlite:" + SQLITE_DB_NAME;
-        boolean dbExists = new File(SQLITE_DB_NAME).exists();
         Connection conn = DriverManager.getConnection(url);
+
+        // Always enable foreign keys for every SQLite connection
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("PRAGMA foreign_keys = ON;");
+        }
 
         initializeSQLiteDatabase(conn);
         return conn;
@@ -110,9 +115,6 @@ public class DatabaseConnector {
 
     private static void initializeSQLiteDatabase(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
-            // Enable foreign key support in SQLite
-            stmt.execute("PRAGMA foreign_keys = ON;");
-
             // 1. Admins Table
             stmt.execute("CREATE TABLE IF NOT EXISTS admins (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -122,8 +124,12 @@ public class DatabaseConnector {
                     ");");
 
             // Seed Default Admin (only if empty)
-            stmt.execute("INSERT OR IGNORE INTO admins (id, username, password, full_name) " +
-                    "VALUES (1, 'admin', 'admin123', 'System Administrator');");
+            try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM admins")) {
+                if (rs.next() && rs.getInt(1) == 0) {
+                    stmt.execute("INSERT INTO admins (id, username, password, full_name) " +
+                            "VALUES (1, 'admin', 'admin123', 'System Administrator');");
+                }
+            }
 
             // 2. Employees Table
             stmt.execute("CREATE TABLE IF NOT EXISTS employees (" +
@@ -135,10 +141,14 @@ public class DatabaseConnector {
                     ");");
 
             // Seed Test Employees (only if empty)
-            stmt.execute("INSERT OR IGNORE INTO employees (id, employee_code, full_name, department) VALUES " +
-                    "(1, 'EMP-001', 'Alice Smith', 'Engineering')," +
-                    "(2, 'EMP-002', 'Bob Jones', 'Human Resources')," +
-                    "(3, 'EMP-003', 'Charlie Brown', 'Design');");
+            try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM employees")) {
+                if (rs.next() && rs.getInt(1) == 0) {
+                    stmt.execute("INSERT INTO employees (id, employee_code, full_name, department) VALUES " +
+                            "(1, 'EMP-001', 'Alice Smith', 'Engineering')," +
+                            "(2, 'EMP-002', 'Bob Jones', 'Human Resources')," +
+                            "(3, 'EMP-003', 'Charlie Brown', 'Design');");
+                }
+            }
 
             // 3. Daily Verification Codes Table
             stmt.execute("CREATE TABLE IF NOT EXISTS daily_codes (" +
@@ -147,9 +157,13 @@ public class DatabaseConnector {
                     "generated_date TEXT UNIQUE NOT NULL DEFAULT (date('now'))" +
                     ");");
 
-            // Seed initial code for today
-            stmt.execute("INSERT OR IGNORE INTO daily_codes (id, validation_code, generated_date) " +
-                    "VALUES (1, '12345', date('now'));");
+            // Seed initial code for today (only if empty)
+            try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM daily_codes")) {
+                if (rs.next() && rs.getInt(1) == 0) {
+                    stmt.execute("INSERT INTO daily_codes (id, validation_code, generated_date) " +
+                            "VALUES (1, '12345', date('now'));");
+                }
+            }
 
             // 4. Attendance Logs Table
             stmt.execute("CREATE TABLE IF NOT EXISTS attendance_logs (" +
@@ -194,8 +208,12 @@ public class DatabaseConnector {
                     ");");
 
             // Seed Default Admin (only if empty)
-            stmt.execute("INSERT IGNORE INTO admins (id, username, password, full_name) " +
-                    "VALUES (1, 'admin', 'admin123', 'System Administrator');");
+            try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM admins")) {
+                if (rs.next() && rs.getInt(1) == 0) {
+                    stmt.execute("INSERT INTO admins (id, username, password, full_name) " +
+                            "VALUES (1, 'admin', 'admin123', 'System Administrator');");
+                }
+            }
 
             // 2. Employees Table
             stmt.execute("CREATE TABLE IF NOT EXISTS employees (" +
@@ -207,10 +225,14 @@ public class DatabaseConnector {
                     ");");
 
             // Seed Test Employees (only if empty)
-            stmt.execute("INSERT IGNORE INTO employees (id, employee_code, full_name, department) VALUES " +
-                    "(1, 'EMP-001', 'Alice Smith', 'Engineering')," +
-                    "(2, 'EMP-002', 'Bob Jones', 'Human Resources')," +
-                    "(3, 'EMP-003', 'Charlie Brown', 'Design');");
+            try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM employees")) {
+                if (rs.next() && rs.getInt(1) == 0) {
+                    stmt.execute("INSERT INTO employees (id, employee_code, full_name, department) VALUES " +
+                            "(1, 'EMP-001', 'Alice Smith', 'Engineering')," +
+                            "(2, 'EMP-002', 'Bob Jones', 'Human Resources')," +
+                            "(3, 'EMP-003', 'Charlie Brown', 'Design');");
+                }
+            }
 
             // 3. Daily Verification Codes Table
             stmt.execute("CREATE TABLE IF NOT EXISTS daily_codes (" +
@@ -219,9 +241,13 @@ public class DatabaseConnector {
                     "generated_date DATE UNIQUE NOT NULL DEFAULT (CURRENT_DATE)" +
                     ");");
 
-            // Seed initial code for today
-            stmt.execute("INSERT IGNORE INTO daily_codes (id, validation_code, generated_date) " +
-                    "VALUES (1, '12345', CURRENT_DATE);");
+            // Seed initial code for today (only if empty)
+            try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM daily_codes")) {
+                if (rs.next() && rs.getInt(1) == 0) {
+                    stmt.execute("INSERT INTO daily_codes (id, validation_code, generated_date) " +
+                            "VALUES (1, '12345', CURRENT_DATE);");
+                }
+            }
 
             // 4. Attendance Logs Table
             stmt.execute("CREATE TABLE IF NOT EXISTS attendance_logs (" +
